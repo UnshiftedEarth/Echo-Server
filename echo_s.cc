@@ -4,7 +4,6 @@
 // **************************************************************************************
 #include "echo_s.h"
 
-
 // **************************************************************************************
 // * processConnection()
 // * - Handles reading the line from the network and sending it back to the client.
@@ -15,19 +14,47 @@ int processConnection(int sockFd) {
   int quitProgram = 0;
   int keepGoing = 1;
   while (keepGoing) {
-
+    DEBUG << "Waiting for new data" << ENDL;
     //
     // Call read() call to get a buffer/line from the client.
     // Hint - don't forget to zero out the buffer each time you use it.
-    //
+    // 
+    char buffer[1024];
+    bzero(buffer, sizeof(buffer));
+    if (read(sockFd, buffer, sizeof(buffer)) == -1) {
+      DEBUG << "Error Reading From Connection: " << strerror(errno) << ENDL;
+      return 1;
+    }
+    DEBUG << "Called read(" << sockFd << "," << &buffer << "," << sizeof(buffer) << ")" << ENDL;
 
-    //
-    // Check for one of the commands
-    //
 
-    //
-    // Call write() to send line back to the client.
-    //
+    std::string quitCommand = "QUIT";
+    std::string closeCommand = "CLOSE";
+    std::string command = std::string(buffer, 5);
+    if (command.substr(0,4).compare(quitCommand) == 0) {
+      // the user typed the quit command close connection and terminate program
+      quitProgram = 1;
+      keepGoing = 0;
+      DEBUG << "Recieved QUIT command" << ENDL;
+    }
+    else if (command.compare(closeCommand) == 0) {
+      // the user typed the close command close connection and wait for another
+      keepGoing = 0;
+      DEBUG << "Recieved CLOSE command" << ENDL;
+    }
+    else {
+      DEBUG << "Recieved " << "NULL" << " bytes which are: " << buffer;
+      //
+      // Call write() to send line back to the client.
+      //
+      if (write(sockFd, buffer, sizeof(buffer)) == -1) {
+        DEBUG << "Error Writing To Connection: " << strerror(errno) << ENDL;
+        return 1;
+      }
+      DEBUG << "Called write(" << sockFd << "," << &buffer << "," << sizeof(buffer) << ")" << ENDL;
+      DEBUG << "Wrote " << "NULL" << " back to client" << ENDL;
+    }
+    
 
   }
 
@@ -70,16 +97,20 @@ int main (int argc, char *argv[]) {
   // *******************************************************************
   // * Creating the inital socket is the same as in a client.
   // ********************************************************************
-  int     listenFd = -1;
+  int listenFd = -1;
        // Call socket() to create the socket you will use for lisening.
   DEBUG << "Calling Socket() assigned file descriptor " << listenFd << ENDL;
+  if ((listenFd = socket(PF_INET, SOCK_STREAM, 0)) == -1) {
+    DEBUG << "Error creating socket: " << strerror(errno) << ENDL;
+    return -1;
+  }
 
   
   // ********************************************************************
   // * The bind() and calls take a structure that specifies the
   // * address to be used for the connection. On the cient it contains
   // * the address of the server to connect to. On the server it specifies
-  // * which IP address and port to lisen for connections.
+  // * which IP address and port to listen for connections.
   // ********************************************************************
   struct sockaddr_in servaddr;
   srand(time(NULL));
@@ -88,7 +119,7 @@ int main (int argc, char *argv[]) {
   servaddr.sin_family = PF_INET;
   servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
   servaddr.sin_port = htons(port);
-
+  socklen_t sockLength = sizeof(servaddr);
 
   // ********************************************************************
   // * Binding configures the socket with the parameters we have
@@ -100,7 +131,14 @@ int main (int argc, char *argv[]) {
   while (!bindSuccesful) {
     // You may have to call bind multiple times if another process is already using the port
     // your program selects.
+    if (bind(listenFd, (sockaddr *) &servaddr, sockLength) == -1) {
+      DEBUG << "Socket Error: " << strerror(errno) << ENDL;
+      port += 1;
+      continue;
+    }
+    bindSuccesful = 1;
   }
+
   std::cout << "Using port " << port << std::endl;
 
 
@@ -111,7 +149,9 @@ int main (int argc, char *argv[]) {
   // ********************************************************************
   int listenQueueLength = 1;
   DEBUG << "Calling listen(" << listenFd << "," << listenQueueLength << ")" << ENDL;
- 
+  if (listen(listenFd, listenQueueLength) == -1) {
+    DEBUG << "Listening for connection failed: " << strerror(errno) << ENDL;
+  }
 
   // ********************************************************************
   // * The accept call will sleep, waiting for a connection.  When 
@@ -122,14 +162,18 @@ int main (int argc, char *argv[]) {
   while (!quitProgram) {
     int connFd = 0;
 
-    DEBUG << "Calling accept(" << listenFd << "NULL,NULL)." << ENDL;
+    DEBUG << "Calling accept(" << listenFd << "," << &servaddr << "," << sockLength << ")" << ENDL;
 
     // The accept() call checks the listening queue for connection requests.
     // If a client has already tried to connect accept() will complete the
     // connection and return a file descriptor that you can read from and
     // write to. If there is no connection waiting accept() will block and
     // not return until there is a connection.
-    
+
+    if ((connFd = accept(listenFd, (sockaddr *) &servaddr, &sockLength)) == -1) {
+      DEBUG << "Accept Failed: " << strerror(errno) << ENDL;
+    }
+
     DEBUG << "We have recieved a connection on " << connFd << ENDL;
 
     
