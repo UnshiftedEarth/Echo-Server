@@ -28,10 +28,18 @@ int processConnection(int sockFd) {
     DEBUG << "Called read(" << sockFd << "," << &buffer << "," << sizeof(buffer) << ")" << ENDL;
 
 
+    /* remove the access bytes from the received message */
+    std::string temp = std::string(buffer, 1024);
+    int bufferLen = temp.find('\0');
+    temp = temp.substr(0, bufferLen);
+    char received[temp.length()+1];
+    strcpy(received, temp.c_str());
+
+
     std::string quitCommand = "QUIT";
     std::string closeCommand = "CLOSE";
     std::string command = std::string(buffer, 5);
-    if (command.substr(0,4).compare(quitCommand) == 0) {
+    if (command.substr(0, 4).compare(quitCommand) == 0) {
       // the user typed the quit command close connection and terminate program
       quitProgram = 1;
       keepGoing = 0;
@@ -43,16 +51,16 @@ int processConnection(int sockFd) {
       DEBUG << "Recieved CLOSE command" << ENDL;
     }
     else {
-      DEBUG << "Recieved " << "NULL" << " bytes which are: " << buffer;
+      DEBUG << "Recieved " << sizeof(received) << " bytes which are: " << received;
       //
       // Call write() to send line back to the client.
       //
-      if (write(sockFd, buffer, sizeof(buffer)) == -1) {
+      if (write(sockFd, received, sizeof(received)) == -1) {
         DEBUG << "Error Writing To Connection: " << strerror(errno) << ENDL;
         return 1;
       }
-      DEBUG << "Called write(" << sockFd << "," << &buffer << "," << sizeof(buffer) << ")" << ENDL;
-      DEBUG << "Wrote " << "NULL" << " back to client" << ENDL;
+      DEBUG << "Called write(" << sockFd << "," << &buffer << "," << sizeof(received) << ")" << ENDL;
+      DEBUG << "Wrote " << sizeof(received) << " back to client" << ENDL;
     }
     
 
