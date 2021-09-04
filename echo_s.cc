@@ -28,7 +28,7 @@ int processConnection(int sockFd) {
     DEBUG << "Called read(" << sockFd << "," << &buffer << "," << sizeof(buffer) << ")" << ENDL;
 
 
-    /* remove the access bytes from the received message */
+    /* remove the excess (unused) bytes from the received message buffer */
     std::string temp = std::string(buffer, 1024);
     int bufferLen = temp.find('\0');
     temp = temp.substr(0, bufferLen);
